@@ -248,7 +248,7 @@ thread_block (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   thread_current() -> priority -= thread_current()->priority>0?1:0;
-  list_push_back(&ready_list[thread_get_priority(thread_current())], &thread_current()->elem);
+  list_push_back(&ready_list[thread_get_priority()], &thread_current()->elem);
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
 }
