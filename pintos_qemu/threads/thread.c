@@ -95,8 +95,8 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  for(int i=PRI_MAX; i<PRI_MIN; i++){
-    list_init (&ready_list);
+  for(int i=PRI_MAX; i<PRI_MIN+1; i++){
+    list_init (&ready_list[i]);
   }
   list_init (&all_list);
   list_init (&sleep_list);
@@ -143,7 +143,7 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  for(int i=t->priority+1; i<PRI_MIN; i++){
+  for(int i=t->priority+1; i<PRI_MIN+1; i++){
     if (list_empty(&ready_list[i])){
       continue;
     }else{
@@ -151,9 +151,13 @@ thread_tick (void)
       while(tmp!=list_end(&ready_list[i])){
         tmp_thread = list_entry(tmp, struct thread, elem);
         ASSERT(is_thread(tmp_thread));
+        if(tmp_thread->status != THREAD_READY){
+          tmp=list_next(tmp);
+          continue;
+        }
         tmp_thread->age +=1;
         if(tmp_thread->age == 20){
-          tmp_thread->priority -=1;
+          tmp_thread->priority -= 1;
           tmp_thread->age = 0;
           prev = list_prev(tmp);
           list_remove(tmp);
@@ -270,7 +274,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list[t->priority], &t->elem);
+  //list_push_back (&ready_list[t->priority], &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -398,7 +402,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    cur->priority += cur->priority<=3? 1:0; 
+    cur->priority += cur->priority<3? 1:0; 
     list_push_back (&ready_list[cur->priority], &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
@@ -582,11 +586,22 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  for(int i=PRI_MAX; i<PRI_MIN; i++){
-    if (list_empty (&ready_list[i]))
+  for(int i=PRI_MAX; i<PRI_MIN+1; i++){
+    if (list_empty (&ready_list[i])){
       continue;
-    else
-      return list_entry (list_pop_front (&ready_list[i]), struct thread, elem);
+    }
+    else{
+      struct thread *tmp = list_entry (list_pop_front (&ready_list[i]), struct thread, elem);
+      size_t num = list_size(&ready_list[i])-1;
+      while (tmp->status !=THREAD_READY && num>0){
+        list_push_back(&ready_list[i], &tmp->elem);
+        tmp = list_entry (list_pop_front (&ready_list[i]), struct thread, elem);
+      }
+      if(num == 0){
+        continue;
+      }
+      return tmp;
+    }
   }
   return idle_thread;
 }
