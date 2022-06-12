@@ -77,22 +77,55 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
   if (page_cnt == 0)
     return NULL;
   
-  int tmp=1;
+  size_t tmp=1;
   while(1){
     if(tmp<=page_cnt && page_cnt<=tmp*2){
       page_cnt = 2*tmp;
-      tmp*=2;
-    }else{
       break;
+    }else{
+      tmp*=2;
     }
   }
+  printf("%d\n", page_cnt);
 
   lock_acquire (&pool->lock);
   page_idx = bitmap_scan_and_flip (pool->used_map, 0, page_cnt, false);
   lock_release (&pool->lock);
 
-  if (page_idx != BITMAP_ERROR)
+  if (page_idx != BITMAP_ERROR){
+    size_t cnt=1;
+    int k=page_idx;
+    if(page_idx!=0){
+    while(1){
+      
+      printf("%d %d %d\n", page_idx, k, cnt);
+      if(!((k-1)&k)){
+        break;
+      }else{
+        cnt*=2;
+      }
+      if(k<0){
+        cnt=0;
+        break;
+      }
+      k=(page_idx-cnt);
+    }
+    if(page_cnt>cnt && cnt>1){
+      page_idx+=cnt;
+      k*=2;
+      while(k<page_cnt){
+        printf("index:%d\n", page_idx);
+        page_idx+=k;
+        k*=2;
+        if(k==page_cnt){
+          break;
+        }
+      }
+    }
+    }
+    printf("%d\n", page_idx);
     pages = pool->base + PGSIZE * page_idx;
+  }
   else
     pages = NULL;
 
@@ -134,13 +167,13 @@ palloc_free_multiple (void *pages, size_t page_cnt)
   if (pages == NULL || page_cnt == 0)
     return;
 
-  int tmp=1;
+  size_t tmp=1;
   while(1){
     if(tmp<=page_cnt && page_cnt<=tmp*2){
       page_cnt = 2*tmp;
-      tmp*=2;
-    }else{
       break;
+    }else{
+      tmp*=2;
     }
   }
 
@@ -176,6 +209,7 @@ init_pool (struct pool *p, void *base, size_t page_cnt, const char *name)
   /* We'll put the pool's used_map at its base.
      Calculate the space needed for the bitmap
      and subtract it from the pool's size. */
+    
   size_t bm_pages = DIV_ROUND_UP (bitmap_buf_size (page_cnt), PGSIZE);
   if (bm_pages > page_cnt)
     PANIC ("Not enough memory in %s for bitmap.", name);
@@ -221,4 +255,5 @@ palloc_get_status (enum palloc_flags flags)
       printf("\n");
     }
   }
+  printf("\n");
 }
